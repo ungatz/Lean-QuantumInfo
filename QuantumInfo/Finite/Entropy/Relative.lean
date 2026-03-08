@@ -882,6 +882,27 @@ theorem frontier_singleton {X : Type*} [TopologicalSpace X] [T1Space X] [Perfect
     (p : X) : frontier {p} = {p} := by
   simp [frontier]
 
+private theorem sandwichedRelRentropy.continuousOn_Ioi_1_aux (ρ σ : MState d) :
+    ContinuousOn (fun (α : ℝ) ↦ ((HermitianMat.conj (σ.M ^ ((1 - α) / (2 * α))).mat) ρ.M ^ α)) (Set.Ioi 1) := by
+  have h_cont : ContinuousOn (fun α : ℝ => (HermitianMat.conj (σ.M ^ ((1 - α) / (2 * α))).mat) ρ.M) (Set.Ioi 1) := by
+    have h_cont : ContinuousOn (fun α : ℝ => (σ.M ^ ((1 - α) / (2 * α))).mat) (Set.Ioi 1) := by
+      have h_cont : ContinuousOn (fun α : ℝ => σ.M ^ ((1 - α) / (2 * α))) (Set.Ioi 1) := by
+        have h_cont : ContinuousOn (fun α : ℝ => (1 - α) / (2 * α)) (Set.Ioi 1) := by
+          exact continuousOn_of_forall_continuousAt fun x hx => ContinuousAt.div ( continuousAt_const.sub continuousAt_id ) ( continuousAt_const.mul continuousAt_id ) ( by linarith [ hx.out ] )
+        have h_cont : ContinuousOn (fun α : ℝ => (σ.M ^ α)) (Set.Iio 0) := by
+          apply_rules [ HermitianMat.continuousOn_rpow_neg ];
+        exact h_cont.comp ‹_› fun x hx => by rw [ Set.mem_Iio ] ; rw [ div_lt_iff₀ ] <;> linarith [ hx.out ] ;
+      exact Continuous.comp_continuousOn ( by continuity ) h_cont;
+    fun_prop;
+  -- Apply the lemma HermitianMat.continuousOn_rpow_joint_nonneg_pos with the given conditions.
+  apply HermitianMat.continuousOn_rpow_joint_nonneg_pos;
+  · exact h_cont;
+  · exact continuousOn_id;
+  · intro α hα;
+    apply_rules [ HermitianMat.conj_nonneg ];
+    exact ρ.nonneg;
+  · exact fun x hx => zero_lt_one.trans hx
+
 private theorem sandwichedRelRentropy.continuousOn_Ioi_1 (ρ σ : MState d) :
     ContinuousOn (fun α => D̃_ α(ρ‖σ)) (Set.Ioi 1) := by
   dsimp [SandwichedRelRentropy]
@@ -892,9 +913,8 @@ private theorem sandwichedRelRentropy.continuousOn_Ioi_1 (ρ σ : MState d) :
     · apply (ENNReal.continuous_ofReal).comp_continuousOn
       apply ContinuousOn.div₀
       · apply ContinuousOn.log
-        · apply HermitianMat.trace_Continuous.comp_continuousOn
-          simp only [HermitianMat.conj, AddMonoidHom.coe_mk, ZeroHom.coe_mk]
-          sorry
+        · exact HermitianMat.trace_Continuous.comp_continuousOn
+            (continuousOn_Ioi_1_aux ρ σ)
         · intro x hx
           apply LT.lt.ne'
           grw [← sandwiched_trace_of_gt_1 hρ hx]
@@ -909,12 +929,246 @@ private theorem sandwichedRelRentropy.continuousOn_Ioi_1 (ρ σ : MState d) :
     · clear ρ σ hρ;
       grind only [→ Set.EqOn.eq_of_mem, = Set.mem_Ioi, Set.EqOn, cases Or]
 
+/-- Continuity on (0,1): the sandwich relative Rényi entropy is continuous in α on (0,1). -/
+private theorem sandwichedRelRentropy.continuousOn_Ioo_0_1 (ρ σ : MState d) :
+    ContinuousOn (fun α => D̃_ α(ρ‖σ)) (Set.Ioo 0 1) := by
+  sorry
+
+/-
+PROBLEM
+The trace Tr[(ρ.conj (σ^((1-α)/(2α)).mat))^α] equals 1 at α = 1.
+PROVIDED SOLUTION
+At α = 1: (1-1)/(2*1) = 0, so σ^0 = 1 (by HermitianMat.one_rpow or rpow at 0). Then conj 1 ρ.M = ρ.M (by HermitianMat.conj_one). Then ρ.M^1 = ρ.M (by rpow_one). Then trace of ρ.M is 1 (by MState.trace_one or ρ.trace_one).
+-/
+private lemma sandwichedRelRentropy.trace_at_one (ρ σ : MState d) :
+    ((ρ.M.conj (σ.M ^ ((1 - (1:ℝ)) / (2 * (1:ℝ)))).mat) ^ (1:ℝ)).trace = 1 := by
+  norm_num +zetaDelta at *
+
+/-
+PROBLEM
+For fixed PSD B, the derivative of α ↦ Tr[B^α] at α = 1 is ⟪B, B.log⟫ = Tr[B log B].
+PROVIDED SOLUTION
+By `trace_rpow_eq_sum`, (B ^ α).trace = ∑ᵢ (B.H.eigenvalues i) ^ α.
+So the function is α ↦ ∑ᵢ (B.H.eigenvalues i) ^ α, a finite sum of scalar rpow functions.
+Each scalar function α ↦ λᵢ^α is differentiable at α = 1:
+- If λᵢ > 0: HasDerivAt (fun α => λᵢ^α) (λᵢ^1 * Real.log λᵢ) 1, i.e., derivative is λᵢ * log λᵢ.
+- If λᵢ = 0: HasDerivAt (fun α => 0^α) 0 1 (since 0^α = 0 for α > 0, near α = 1 the function is constant 0, actually 0^α has different behavior but near α = 1 where α > 0, it's 0, so derivative is 0). And 0 * log 0 = 0 (by convention Real.log 0 = 0 and 0 * 0 = 0). Wait, we need to handle this carefully.
+For λᵢ = 0: the function is α ↦ 0^α = if α = 0 then 1 else 0. Near α = 1, this is constantly 0. So the derivative is 0. And λᵢ * log λᵢ = 0 * log 0 = 0 * 0 = 0 (since Real.log 0 = 0 in Lean). So the derivative matches.
+For λᵢ > 0: the function is differentiable with derivative λᵢ * log λᵢ (by `Real.hasDerivAt_rpow_const` or `HasDerivAt` for x^α).
+The sum of HasDerivAt gives HasDerivAt for the whole sum: derivative is ∑ᵢ λᵢ * log λᵢ.
+Now ⟪B, B.log⟫ = Tr[B * B.log] = ∑ᵢ eigenvalue(i) * log(eigenvalue(i)) (by trace_cfc_eq or inner_cfc_eq_sum, using cfc_mul or similar). Actually, ⟪B, B.log⟫ can be computed as Tr[B · B.log] = ∑ᵢ λᵢ * log λᵢ by the spectral decomposition.
+So the derivative equals ⟪B, B.log⟫.
+Key steps:
+1. Rewrite (B^α).trace using trace_rpow_eq_sum (or trace_cfc_eq).
+2. Show HasDerivAt for each term λᵢ^α at α = 1.
+3. Sum the derivatives.
+4. Show the sum of derivatives equals ⟪B, B.log⟫.
+For step 2, use `Real.hasDerivAt_rpow_const` or compute directly. The derivative of x^α with respect to α is x^α * log x. At α = 1: x * log x.
+Actually, the function is α ↦ c^α for fixed c ≥ 0. Its derivative at α = 1 is:
+- c > 0: c * log c (from exp(α log c), derivative is exp(α log c) * log c = c^α * log c)
+- c = 0: 0 (constant function near α = 1)
+Use `hasDerivAt_rpow_const` or `hasDerivAt_exp` composed with multiplication by log c.
+-/
+private lemma hasDerivAt_trace_rpow_at_one (B : HermitianMat d ℂ) (hB : 0 ≤ B) :
+    HasDerivAt (fun α : ℝ => (B ^ α).trace) ⟪B, B.log⟫ 1 := by
+  have h_inner : ⟪B, B.log⟫ = ∑ i, (B.H.eigenvalues i) * Real.log (B.H.eigenvalues i) := by
+    -- By definition of the inner product, we have ⟪B, B.log⟫ = tr(B * B.log).
+    have h_inner_def : ⟪B, B.log⟫ = Matrix.trace (B.mat * B.log.mat) := by
+      simp +decide [ Matrix.trace, Inner.inner ];
+      refine' Finset.sum_congr rfl fun i _ => _;
+      have h_herm : (B * B.log : Matrix d d ℂ).IsHermitian := by
+        have h_comm : Commute (B : Matrix d d ℂ) (B.log : Matrix d d ℂ) := by
+          exact?
+        generalize_proofs at *; exact (by
+        simp_all +decide [ Matrix.IsHermitian, ← Matrix.mul_assoc ];
+        exact h_comm.symm.eq);
+      have := h_herm.apply i i; simp_all +decide [ Complex.ext_iff ] ;
+      linarith;
+    -- By definition of the trace, we have tr(B * B.log) = ∑ i, B.eigenvalues i * log(B.eigenvalues i).
+    have h_trace : Matrix.trace (B.mat * B.log.mat) = ∑ i, B.H.eigenvalues i * Real.log (B.H.eigenvalues i) := by
+      have h_trace : (B ^ 1 * B.log.mat).trace = (HermitianMat.cfc B (fun x => x * Real.log x)).trace := by
+        have h_trace : B ^ 1 * B.log.mat = B.cfc (fun x => x * Real.log x) := by
+          have h_log : B.log = B.cfc (fun x => Real.log x) := by
+            exact?
+          have h_log : B ^ 1 * B.log.mat = B.cfc (fun x => x) * B.cfc (fun x => Real.log x) := by
+            congr! 1
+            generalize_proofs at *; (
+            have h_log : B.cfc (fun x => x) = B := by
+              exact?
+            generalize_proofs at *; (
+            exact h_log.symm ▸ by simp +decide [ pow_one ] ;))
+          generalize_proofs at *; (
+          convert h_log using 1
+          generalize_proofs at *; (
+          exact?))
+        generalize_proofs at *; (
+        convert congr_arg Matrix.trace h_trace using 1
+        generalize_proofs at *; (
+        -- The trace of a matrix is a real number, so converting it to a complex number doesn't change it.
+        have h_trace_real : ∀ (A : Matrix d d ℂ), A.IsHermitian → Matrix.trace A = RCLike.re (Matrix.trace A) := by
+          intro A hA; rw [ Complex.ext_iff ] ; simp +decide [ Matrix.trace, hA.eq ] ;
+          exact Finset.sum_eq_zero fun i _ => by simpa [ Complex.ext_iff ] using congr_fun ( congr_fun hA i ) i |> fun h => by norm_num [ Complex.ext_iff ] at h; linarith;
+        generalize_proofs at *; (
+        convert h_trace_real _ _ |> Eq.symm using 1
+        generalize_proofs at *; (
+        exact?))));
+      simp_all +decide [ HermitianMat.trace_cfc_eq ];
+    exact_mod_cast h_inner_def.trans h_trace;
+  have h_deriv : ∀ i, HasDerivAt (fun α : ℝ => (B.H.eigenvalues i) ^ α) (B.H.eigenvalues i * Real.log (B.H.eigenvalues i)) 1 := by
+    intro i
+    by_cases h_pos : 0 < B.H.eigenvalues i;
+    · convert HasDerivAt.rpow ( hasDerivAt_const _ _ ) ( hasDerivAt_id 1 ) _ using 1 <;> aesop;
+    · have h_zero : B.H.eigenvalues i = 0 := by
+        exact le_antisymm ( le_of_not_gt h_pos ) ( by simpa using hB.eigenvalues_nonneg i )
+      simp [h_zero] at *; (
+      exact HasDerivAt.congr_of_eventuallyEq ( hasDerivAt_const _ _ ) ( Filter.eventuallyEq_of_mem ( Ioi_mem_nhds zero_lt_one ) fun x hx => Real.zero_rpow hx.out.ne' ))
+      skip -- This line should be unreachable, but it's here to make the code compile. In a real proof, this line would be removed.;
+  convert HasDerivAt.sum fun i _ => h_deriv i using 1;
+  ext α; simp +decide [ HermitianMat.trace_rpow_eq_sum ] ;
+
+/-- The derivative of α ↦ Tr[ρ σ^((1-α)/α)] at α = 1 is -⟪ρ, log σ⟫.
+    Uses trace cyclic: Tr[σ^t ρ σ^t] = Tr[ρ σ^(2t)].
+    With 2t(α) = (1-α)/α, d/dα (2t) = -1/α², and d/dε σ^ε|_{ε=0} = log σ. -/
+private lemma hasDerivAt_trace_conj_at_one (ρ σ : MState d)
+    (h : σ.M.ker ≤ ρ.M.ker) :
+    HasDerivAt
+      (fun α : ℝ => ((ρ.M.conj (σ.M ^ ((1 - α) / (2 * α))).mat)).trace)
+      (-⟪ρ.M, σ.M.log⟫)
+      1 := by
+  sorry
+
+private theorem sandwichedRelRentropy.hasDerivAt_trace_at_one (ρ σ : MState d)
+    (h : σ.M.ker ≤ ρ.M.ker) :
+    HasDerivAt
+      (fun α : ℝ => ((ρ.M.conj (σ.M ^ ((1 - α) / (2 * α))).mat) ^ α).trace)
+      ⟪ρ.M, ρ.M.log - σ.M.log⟫
+      1 := by
+  sorry
+
+/-
+PROBLEM
+The key limit: as α → 1, log(Tr[(ρ.conj σ^t)^α]) / (α-1) → ⟪ρ, log ρ - log σ⟫,
+    where t = (1-α)/(2α). Derived from hasDerivAt_trace_at_one via L'Hôpital
+    (or equivalently, log(1+x)/x → 1 and (f(α)-1)/(α-1) → f'(1)).
+PROVIDED SOLUTION
+We know f(α) = Tr[...] has f(1) = 1 (by trace_at_one) and f'(1) = ⟪ρ, log ρ - log σ⟫ (by hasDerivAt_trace_at_one).
+We need: log(f(α))/(α-1) → f'(1) as α → 1 within (Set.Ioi 0 \ {1}).
+Use the factorization:
+  log(f(α))/(α-1) = [log(f(α))/(f(α)-1)] · [(f(α)-1)/(α-1)]
+As α → 1:
+- f(α) → f(1) = 1, so f(α) - 1 → 0
+- (f(α)-1)/(α-1) → f'(1) (by definition of derivative, from hasDerivAt_trace_at_one)
+- log(f(α))/(f(α)-1) = log(1 + (f(α)-1))/(f(α)-1) → 1 (by the standard limit log(1+x)/x → 1)
+So the product → 1 · f'(1) = f'(1).
+For the formal proof:
+1. From `hasDerivAt_trace_at_one`, get `HasDerivAt f c 1` where c = ⟪ρ, log ρ - log σ⟫.
+2. From `trace_at_one`, f(1) = 1.
+3. Use `HasDerivAt.tendsto_slope` or manual argument to get (f(α)-1)/(α-1) → c.
+4. f(α) → 1 follows from continuity (HasDerivAt implies ContinuousAt).
+5. Use `Real.tendsto_log_div_sub_one` or similar for log(x)/(x-1) → 1 as x → 1.
+6. Use `Filter.Tendsto.mul` to combine.
+Key Mathlib lemmas:
+- `Real.hasDerivAt_log` or `Real.tendsto_log_nhdsWithin`
+- The standard limit log(1+x)/x → 1 as x → 0 might be encoded as something like `Real.tendsto_log_div_sub_one`
+- `HasDerivAt.tendsto_slope` for (f(x)-f(a))/(x-a) → f'(a)
+-/
+private theorem sandwichedRelRentropy.limit_at_one (ρ σ : MState d)
+    (h : σ.M.ker ≤ ρ.M.ker) :
+    Filter.Tendsto
+      (fun α : ℝ => ((ρ.M.conj (σ.M ^ ((1 - α) / (2 * α))).mat) ^ α).trace.log / (α - 1))
+      (nhdsWithin 1 (Set.Ioi 0 \ {1}))
+      (nhds ⟪ρ.M, ρ.M.log - σ.M.log⟫) := by
+  have h_log_approx : HasDerivAt (fun α : ℝ => Real.log (((ρ.M.conj (σ.M ^ ((1 - α) / (2 * α))).mat) ^ α).trace)) (⟪ρ.M, ρ.M.log - σ.M.log⟫) 1 := by
+    have h_log_approx : HasDerivAt (fun α : ℝ => (((ρ.M.conj (σ.M ^ ((1 - α) / (2 * α))).mat) ^ α).trace)) (⟪ρ.M, ρ.M.log - σ.M.log⟫) 1 := by
+      convert sandwichedRelRentropy.hasDerivAt_trace_at_one ρ σ h using 1
+      skip
+    generalize_proofs at *; (
+    convert HasDerivAt.log h_log_approx _ using 1 <;> norm_num [ h_log_approx.deriv ])
+  generalize_proofs at *; (
+  rw [ hasDerivAt_iff_tendsto_slope ] at h_log_approx
+  generalize_proofs at *; (
+  convert h_log_approx.mono_left ( nhdsWithin_mono _ _ ) using 2 <;> norm_num [ div_eq_inv_mul, slope_def_field ]))
+
+/-
+PROBLEM
+Continuity at 1: the sandwich relative Rényi entropy is continuous at α = 1.
+PROVIDED SOLUTION
+ContinuousWithinAt at α = 1 within Set.Ioi 0 for the ENNReal-valued function D̃_α(ρ‖σ).
+Case split on `σ.M.ker ≤ ρ.M.ker`:
+Case ¬h: D̃_α(ρ‖σ) = ⊤ for all α > 0 (both for α = 1 and α ≠ 1, by the definition of SandwichedRelRentropy — the `else` branch gives ⊤). So the function is constant ⊤ on Set.Ioi 0, which is trivially ContinuousWithinAt.
+Case h (σ.M.ker ≤ ρ.M.ker):
+- At α = 1: D̃_1 = ENNReal.ofNNReal ⟨⟪ρ.M, ρ.M.log - σ.M.log⟫, _⟩
+- For α ≠ 1, α > 0: D̃_α = ENNReal.ofNNReal ⟨log(Tr[Q_α]) / (α-1), _⟩
+We need to show these converge in ENNReal as α → 1 within Ioi 0.
+The key is: the underlying real-valued function log(Tr[Q_α])/(α-1) converges to ⟪ρ, ρ.log - σ.log⟫ by `sandwichedRelRentropy.limit_at_one`.
+Since `ENNReal.ofNNReal` and the NNReal coercion are continuous, the ENNReal values converge.
+More precisely, dsimp [SandwichedRelRentropy] and split_ifs. For the finite case, show ContinuousWithinAt of the ENNReal.ofNNReal composed with the real-valued function. The real-valued function on Set.Ioi 0 is:
+- At α = 1: ⟪ρ, ρ.log - σ.log⟫
+- At α ≠ 1: log(Tr[Q_α])/(α-1)
+These agree in the limit by limit_at_one. So the real function is continuous at 1 within Ioi 0, and the ENNReal function is continuous by composition with continuous ENNReal.ofNNReal.
+Actually, the tricky part is that the piecewise definition uses `if α = 1 then ... else ...`, so we need to show the ENNReal-valued function `if α = 1 then c₁ else c₂(α)` is ContinuousWithinAt at α = 1 when `c₂(α) → c₁`. Use `continuousWithinAt_if` or a direct argument.
+-/
+private theorem sandwichedRelRentropy.continuousAt_1 (ρ σ : MState d) :
+    ContinuousWithinAt (fun α => D̃_ α(ρ‖σ)) (Set.Ioi 0) 1 := by
+  by_cases h : σ.M.ker ≤ ρ.M.ker <;> simp_all +decide [ ContinuousWithinAt ];
+  · simp +decide [ SandwichedRelRentropy, h ] at *;
+    -- Use the fact that the limit of the real-valued function is the inner product.
+    have h_real_limit : Filter.Tendsto (fun α : ℝ => if α = 1 then ⟪ρ.M, ρ.M.log - σ.M.log⟫ else Real.log ((HermitianMat.conj (σ.M ^ ((1 - α) / (2 * α))).mat) ρ.M ^ α).trace / (α - 1)) (nhdsWithin 1 (Set.Ioi 0)) (nhds ⟪ρ.M, ρ.M.log - σ.M.log⟫) := by
+      have h_real_limit : Filter.Tendsto (fun α : ℝ => Real.log ((HermitianMat.conj (σ.M ^ ((1 - α) / (2 * α))).mat) ρ.M ^ α).trace / (α - 1)) (nhdsWithin 1 (Set.Ioi 0 \ {1})) (nhds ⟪ρ.M, ρ.M.log - σ.M.log⟫) := by
+        convert sandwichedRelRentropy.limit_at_one ρ σ ‹_› using 1
+        skip
+      generalize_proofs at *; (
+      rw [ Metric.tendsto_nhdsWithin_nhds ] at *;
+      intro ε hε; rcases h_real_limit ε hε with ⟨ δ, hδ, H ⟩ ; exact ⟨ δ, hδ, fun x hx₁ hx₂ => by by_cases hx₃ : x = 1 <;> simp [ * ] ⟩ ;)
+    generalize_proofs at *; (
+    -- Since the real-valued function tends to the inner product, the ENNReal version should also tend to the same limit because the ENNReal conversion is continuous.
+    have h_ennreal_limit : Filter.Tendsto (fun α : ℝ => ENNReal.ofReal (if α = 1 then ⟪ρ.M, ρ.M.log - σ.M.log⟫ else Real.log ((HermitianMat.conj (σ.M ^ ((1 - α) / (2 * α))).mat) ρ.M ^ α).trace / (α - 1))) (nhdsWithin 1 (Set.Ioi 0)) (nhds (ENNReal.ofReal ⟪ρ.M, ρ.M.log - σ.M.log⟫)) := by
+      exact ENNReal.tendsto_ofReal h_real_limit |> Filter.Tendsto.comp <| Filter.tendsto_id;
+    generalize_proofs at *; (
+    convert h_ennreal_limit.congr' _ using 2
+    generalize_proofs at *; (
+    exact?);
+    filter_upwards [ self_mem_nhdsWithin ] with α hα ; split_ifs <;> simp_all +decide [ ENNReal.ofReal ] ;
+    · exact?;
+    · exact?));
+  · convert tendsto_const_nhds.congr' _;
+    filter_upwards [ self_mem_nhdsWithin ] with α hα ; unfold SandwichedRelRentropy ; aesop ( simp_config := { singlePass := true } ) ;
+
+/-
+PROVIDED SOLUTION
+We decompose Set.Ioi 0 = Set.Ioo 0 1 ∪ {1} ∪ Set.Ioi 1. We need ContinuousWithinAt at each point α₀ ∈ Set.Ioi 0.
+Case 1: α₀ > 1. Then α₀ ∈ Set.Ioi 1, and ContinuousWithinAt follows from continuousOn_Ioi_1 ρ σ (since Set.Ioi 1 is open in Set.Ioi 0... actually Set.Ioi 1 ⊆ Set.Ioi 0, and ContinuousOn on Set.Ioi 1 gives ContinuousWithinAt on Set.Ioi 1, which implies ContinuousWithinAt on Set.Ioi 0 since Set.Ioi 1 is a neighborhood of α₀ within Set.Ioi 0).
+Case 2: α₀ < 1 (and α₀ > 0). Then α₀ ∈ Set.Ioo 0 1, same argument using continuousOn_Ioo_0_1 ρ σ.
+Case 3: α₀ = 1. This is directly continuousAt_1 ρ σ.
+More precisely, use `ContinuousOn` iff `ContinuousWithinAt` at each point. At each point, use either continuousOn_Ioi_1 or continuousOn_Ioo_0_1 (which give ContinuousWithinAt on the respective subsets), then promote using `ContinuousWithinAt.mono` (larger set gives ContinuousWithinAt on smaller set)... wait, that goes the wrong direction.
+Actually: if S ⊆ T and ContinuousWithinAt f S x, this does NOT imply ContinuousWithinAt f T x. The correct direction: ContinuousWithinAt f T x → ContinuousWithinAt f S x (for S ⊆ T).
+So: ContinuousOn f (Set.Ioi 1) → ContinuousWithinAt f (Set.Ioi 1) α₀ → ContinuousWithinAt f (Set.Ioi 0) α₀ is WRONG.
+The correct approach: if Set.Ioi 1 ∈ nhdsWithin α₀ (Set.Ioi 0), then ContinuousWithinAt f (Set.Ioi 1) α₀ → ContinuousWithinAt f (Set.Ioi 0) α₀. And Set.Ioi 1 ∈ nhdsWithin α₀ (Set.Ioi 0) when α₀ > 1 (since Set.Ioi 1 is open and contains α₀). Use `ContinuousWithinAt.mono_of_mem` or `nhdsWithin_mono` / `nhdsWithin_inter_of_mem`.
+Actually, the cleanest approach:
+- Set.Ioi 0 can be written as Set.Iio 1 ∩ Set.Ioi 0 ∪ Set.Ici 1 ∩ Set.Ioi 0 = Set.Ioo 0 1 ∪ Set.Ici 1.
+- But this gets messy. Instead, just check ContinuousWithinAt at each point:
+For α₀ ∈ Set.Ioi 0:
+- If α₀ > 1: ContinuousWithinAt f (Set.Ioi 0) α₀ follows because Set.Ioi 1 is a neighborhood of α₀ in Set.Ioi 0, and f is ContinuousOn on Set.Ioi 1.
+  Use: `(continuousOn_Ioi_1 ρ σ).continuousWithinAt (Set.mem_Ioi.mpr (by linarith))` composed with `ContinuousWithinAt.mono_of_mem`.
+- If α₀ < 1: Similarly, Set.Ioo 0 1 is a neighborhood of α₀ in Set.Ioi 0, use continuousOn_Ioo_0_1.
+- If α₀ = 1: Directly from continuousAt_1.
+Actually for the case split: use `lt_trichotomy α₀ 1` or `rcases lt_trichotomy α₀ 1`.
+For the mono_of_mem argument, use `nhdsWithin_mono` or the fact that if U is open, U ⊆ S, and x ∈ U, then nhdsWithin x U = nhdsWithin x S restricted.
+Key Mathlib lemma: `ContinuousWithinAt.mono_of_mem : ContinuousWithinAt f s x → s ∈ nhdsWithin x t → ContinuousWithinAt f t x`.
+-/
 @[fun_prop]
 theorem sandwichedRelRentropy.continuousOn (ρ σ : MState d) :
     ContinuousOn (fun α => D̃_ α(ρ‖σ)) (Set.Ioi 0) := by
   --If this turns out too hard, we just need `ContinousAt f 1`.
   --If that's still too hard, we really _just_ need that `(𝓝[>] 1).Tendsto f (𝓝 (f 1))`.
-  sorry
+  intro α hα
+  by_cases hα1 : α = 1
+  · exact sandwichedRelRentropy.continuousAt_1 ρ σ
+  · cases lt_or_gt_of_ne hα1;
+    · exact ContinuousAt.continuousWithinAt ( by exact ContinuousAt.comp ( show ContinuousAt ( fun α => SandwichedRelRentropy α ρ σ ) α from by exact (by
+                                                                            exact (by simpa using (sandwichedRelRentropy.continuousOn_Ioo_0_1 ρ σ).continuousAt (Ioo_mem_nhds hα (by linarith)))) ) ( continuousAt_id ) );
+    · exact ContinuousAt.continuousWithinAt ( by exact ContinuousAt.comp ( show ContinuousAt ( fun α => SandwichedRelRentropy α ρ σ ) α from by exact (by
+                                                                            exact ( by have := sandwichedRelRentropy.continuousOn_Ioi_1 ρ σ; exact this.continuousAt ( Ioi_mem_nhds ‹_› ) )) ) ( continuousAt_id ) )
 
 /-- Quantum relative entropy as `Tr[ρ (log ρ - log σ)]` when supports are correct. -/
 theorem qRelativeEnt_ker {ρ σ : MState d} (h : σ.M.ker ≤ ρ.M.ker) :
