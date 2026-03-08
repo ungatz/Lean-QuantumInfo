@@ -412,6 +412,8 @@ theorem rpow_le_rpow_of_posDef (hA : A.mat.PosDef) (hAB : A ≤ B)
     simp_all
 
 open ComplexOrder Filter in
+/-- The **Löwner—Heinz theorem**: for matrices A and B, if `0 ≤ A ≤ B` and `0 < q ≤ 1`,
+then `A^q ≤ B^q`. That is, real roots are operator monotone. -/
 theorem rpow_le_rpow_of_le (hA : 0 ≤ A) (hAB : A ≤ B)
     (hq : 0 < q) (hq1 : q ≤ 1) : A ^ q ≤ B ^ q := by
   -- For ε > 0, let Aε = A + ε • 1 and Bε = B + ε • 1.
@@ -457,13 +459,25 @@ section ArakiLiebThirring
 
 variable {A B : HermitianMat d ℂ} {q r : ℝ}
 
-/-- Araki-Lieb-Thirring inequality for 0 < q ≤ 1:
-    `Tr[(B^r A B^r)^q] ≤ Tr[B^{rq} A^q B^{rq}]`. -/
+/-- An inequality of Lieb-Thirring type. For 0 < q ≤ 1:
+  `Tr[(B A B)^q] ≤ Tr[B^q A^q B^q]`.
+-/
+lemma lieb_thirring_le_one
+    {A B : HermitianMat d ℂ} (hA : 0 ≤ A) (hB : 0 ≤ B)
+    {q : ℝ} (hq0 : 0 < q) (hq1 : q ≤ 1) :
+    ((A.conj B.mat) ^ q).trace ≤ ((A ^ q).conj (B ^ q).mat).trace := by
+  sorry
+
+/-- An inequality of Araki-Lieb-Thirring type. For 0 < q ≤ 1:
+  `Tr[(B^r A B^r)^q] ≤ Tr[B^{rq} A^q B^{rq}]`.
+Note that this is actually just a special case of the above where `B := B ^ r`.
+-/
 lemma araki_lieb_thirring_le_one
     {A B : HermitianMat d ℂ} (hA : 0 ≤ A) (hB : 0 ≤ B)
     (r : ℝ) {q : ℝ} (hq0 : 0 < q) (hq1 : q ≤ 1) :
     ((A.conj (B ^ r).mat) ^ q).trace ≤ ((A ^ q).conj (B ^ (r * q)).mat).trace := by
-  sorry
+  rw [rpow_mul hB]
+  exact lieb_thirring_le_one hA (rpow_nonneg hB) hq0 hq1
 
 end ArakiLiebThirring
 
