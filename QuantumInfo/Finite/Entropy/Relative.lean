@@ -239,7 +239,7 @@ private theorem sandwiched_trace_of_lt_1 (hα₀ : 0 < α) (hα : α < 1) :
     calc ((ρ.M.conj (σ.M ^ t).mat) ^ α).trace
         ≤ (((ρ.M ^ (2 / 2)).trace) ^ (1 / 2) *
           (((σ.M ^ t) ^ (2 * α / (1 - α))).trace) ^ (1 / (2 * α / (1 - α)))) ^ (2 * α) :=
-          trace_rpow_conj_le ρ.nonneg (HermitianMat.rpow_nonneg σ.nonneg) hα₀ hp hq hpq
+          HermitianMat.trace_rpow_conj_le ρ.nonneg (HermitianMat.rpow_nonneg σ.nonneg) hα₀ hp hq hpq
       _ = 1 := by
           -- Simplify: ρ.M ^ (2/2) = ρ.M ^ 1 = ρ.M, Tr[ρ.M] = 1
           -- (σ.M ^ t) ^ (2α/(1-α)) = σ.M ^ (t * 2α/(1-α)) = σ.M ^ 1, Tr[σ.M] = 1

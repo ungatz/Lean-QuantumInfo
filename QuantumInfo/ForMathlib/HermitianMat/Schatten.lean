@@ -37,6 +37,17 @@ theorem schattenNorm_hermitian_pow {A : HermitianMat d ℂ} (hA : 0 ≤ A) {p : 
   rw [sq]
   exact Matrix.IsHermitian.cfc_eq _ _
 
+theorem schattenNorm_nonneg (A : Matrix d d ℂ) (p : ℝ) : 0 ≤ schattenNorm A p := by
+  refine Real.rpow_nonneg ?_ (1 / p)
+  rw [ Matrix.trace ] at *
+  simp_all [ Matrix.IsHermitian.cfc ] ;
+  simp [ Matrix.mul_apply, Matrix.diagonal ] at *;
+  refine Finset.sum_nonneg fun i _ => Finset.sum_nonneg fun j _ => ?_
+  ring_nf
+  exact add_nonneg ( mul_nonneg (by positivity) ( Real.rpow_nonneg ( by
+    exact Matrix.eigenvalues_conjTranspose_mul_self_nonneg A j ) _ ) ) ( mul_nonneg ( Real.rpow_nonneg ( by
+    exact Matrix.eigenvalues_conjTranspose_mul_self_nonneg A j ) _ ) (by positivity) )
+
 lemma schattenNorm_pow_eq
   (A : HermitianMat d ℂ) (hA : 0 ≤ A) (p k : ℝ) (hp : 0 < p) (hk : 0 < k) :
     schattenNorm (A ^ k).mat p = (schattenNorm A.mat (k * p)) ^ k := by
@@ -149,52 +160,23 @@ lemma schattenNorm_mul_le (A B : Matrix d d ℂ) {r p q : ℝ}
     schattenNorm (A * B) r ≤ schattenNorm A p * schattenNorm B q := by
   sorry
 
-lemma trace_rpow_conj_le
+lemma HermitianMat.trace_rpow_conj_le
     {A B : HermitianMat d ℂ} (hA : 0 ≤ A) (hB : 0 ≤ B)
     {α p q : ℝ} (hα : 0 < α) (hp : 0 < p) (hq : 0 < q)
     (hpq : 1 / (2 * α) = 1 / p + 1 / q) :
     ((A.conj B.mat) ^ α).trace ≤
     (((A ^ (p / 2)).trace) ^ (1 / p) * ((B ^ q).trace) ^ (1 / q)) ^ (2 * α) := by
-  by_contra h_contra;
-  -- Apply the Schatten-Hölder inequality to the matrices $A^{1/2} * B$.
-  have h_schatten_holder : schattenNorm ((A ^ (1 / 2 : ℝ)).mat * B.mat) (2 * α) ≤ schattenNorm (A ^ (1 / 2 : ℝ)).mat p * schattenNorm B.mat q := by
-    apply_rules [ schattenNorm_mul_le ];
-    positivity;
   -- Raise both sides of the inequality to the power of $2\alpha$.
   have h_exp : ((A.conj B.mat) ^ α).trace ≤ (schattenNorm (A ^ (1 / 2 : ℝ)).mat p * schattenNorm B.mat q) ^ (2 * α) := by
-    have h_exp : ((A.conj B.mat) ^ α).trace = (schattenNorm ((A ^ (1 / 2 : ℝ)).mat * B.mat) (2 * α)) ^ (2 * α) := by
-      convert schattenNorm_half_mul_rpow_eq_trace_conj hA hα |> Eq.symm using 1;
-    exact h_exp.symm ▸ Real.rpow_le_rpow ( by
-      refine' Real.rpow_nonneg _ _;
-      have h_nonneg : ∀ (M : Matrix d d ℂ), 0 ≤ RCLike.re ((Matrix.isHermitian_mul_conjTranspose_self M.conjTranspose).cfc (fun x => x ^ (α))).trace := by
-        intro M
-        have h_nonneg : ∀ (x : ℝ), 0 ≤ x → 0 ≤ x ^ α := by
-          exact fun x hx => Real.rpow_nonneg hx α
-        generalize_proofs at *;
-        rw [ Matrix.trace ] at *; simp_all [ Matrix.IsHermitian.cfc ] ;
-        simp [ Matrix.mul_apply, Matrix.diagonal ] at *; (
-        refine' Finset.sum_nonneg fun i _ => Finset.sum_nonneg fun j _ => _ ; ring_nf ; (
-        exact add_nonneg ( mul_nonneg ( sq_nonneg _ ) ( h_nonneg _ ( by
-          exact Matrix.eigenvalues_conjTranspose_mul_self_nonneg M j ) ) ) ( mul_nonneg ( h_nonneg _ ( by
-          exact Matrix.eigenvalues_conjTranspose_mul_self_nonneg M j ) ) ( sq_nonneg _ ) )););
-      field_simp;
-      convert h_nonneg ( ( A ^ ( 1 / 2 : ℝ ) ).mat * B.mat ) using 1 ) h_schatten_holder ( by positivity );
-  -- By definition of Schatten norm, we know that:
-  have h_schatten_norm_def : schattenNorm (A ^ (1 / 2 : ℝ)).mat p = ((A ^ (1 / 2 : ℝ)) ^ p).trace ^ (1 / p) ∧ schattenNorm B.mat q = (B ^ q).trace ^ (1 / q) := by
-    apply And.intro
-    all_goals generalize_proofs at *;
-    · convert schattenNorm_hermitian_pow _ hp using 1
-      (generalize_proofs at *; (
-      exact HermitianMat.rpow_nonneg hA));
-    · apply schattenNorm_hermitian_pow hB hq
-  generalize_proofs at *; (
-  -- Substitute the definitions of the Schatten norms into the inequality.
-  rw [h_schatten_norm_def.left, h_schatten_norm_def.right] at h_exp
-  generalize_proofs at *; (
-  -- By the properties of exponents, we can simplify the expression.
+    have h_exp : (schattenNorm ((A ^ (1 / 2 : ℝ)).mat * B.mat) (2 * α)) ^ (2 * α) = ((A.conj B.mat) ^ α).trace := by
+      exact schattenNorm_half_mul_rpow_eq_trace_conj hA hα
+    rw [← h_exp]
+    -- Apply the Schatten-Hölder inequality to the matrices $A^{1/2} * B$.
+    refine Real.rpow_le_rpow ?_ (schattenNorm_mul_le _ _ (by positivity) hp hq hpq) (by positivity)
+    exact schattenNorm_nonneg _ _
+  rw [schattenNorm_hermitian_pow (rpow_nonneg hA) hp, schattenNorm_hermitian_pow hB hq] at h_exp
   have h_exp_simp : (A ^ (1 / 2 : ℝ)) ^ p = A ^ (p / 2 : ℝ) := by
-    -- By the properties of exponents, we can simplify the expression using the fact that $(A^a)^b = A^{a*b}$.
-    have h_exp_simp : ∀ (a b : ℝ), (A ^ a) ^ b = A ^ (a * b) := by
-      exact fun a b => Eq.symm (HermitianMat.rpow_mul hA)
-    generalize_proofs at *; (exact h_exp_simp (1 / 2 : ℝ) p ▸ by ring_nf)
-  generalize_proofs at *; (exact h_contra (by rw [h_exp_simp] at h_exp; exact h_exp))))
+    rw [← HermitianMat.rpow_mul hA]
+    ring_nf
+  rw [h_exp_simp] at h_exp
+  exact h_exp
