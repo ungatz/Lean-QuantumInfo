@@ -169,22 +169,14 @@ lemma sum_mul_log_nonneg_of_weak_log_maj {n : ℕ}
       ∏ i : Fin k, y ⟨i.val, by omega⟩) :
     0 ≤ ∑ i, x i * Real.log (y i / x i) := by
   by_contra h_neg
-  generalize_proofs at *;
   -- Let $d_i = \log(y_i / x_i)$ and $D_k = \sum_{j=0}^{k} d_j$.
   set d : Fin n → ℝ := fun i => Real.log (y i / x i)
   set D : Fin n → ℝ := fun k => ∑ i ∈ Finset.Iic k, d i;
   -- By Abel's summation formula, we have $\sum_{i=0}^{n-1} x_i d_i = x_{n-1} D_{n-1} + \sum_{i=0}^{n-2} (x_i - x_{i+1}) D_i$.
-  have h_abel : ∑ i, x i * d i = x ⟨n - 1, Nat.sub_lt (Nat.pos_of_ne_zero (by
-  aesop_cat
-  skip)) zero_lt_one⟩ * D ⟨n - 1, Nat.sub_lt (Nat.pos_of_ne_zero (by
-  aesop_cat
-  skip)) zero_lt_one⟩ + ∑ i : Fin (n - 1), (x ⟨i.val, by
-    exact lt_of_lt_of_le i.2 ( Nat.pred_le _ )⟩ - x ⟨i.val + 1, by
-    exact Nat.lt_pred_iff.mp i.2⟩) * D ⟨i.val, by
-    exact lt_of_lt_of_le i.2 ( Nat.pred_le _ )⟩ := by
-    all_goals generalize_proofs at *;
+  have hn : n ≠ 0 := by rintro rfl; simp at h_neg
+  have h_abel : ∑ i, x i * d i = x ⟨n - 1, by omega⟩ * D ⟨n - 1, by omega⟩ + ∑ i : Fin (n - 1),
+      (x ⟨i.val, by omega⟩ - x ⟨i.val + 1, by omega⟩) * D ⟨i.val, by omega⟩ := by
     rcases n with ⟨ ⟩ <;> norm_num at *;
-    rename_i k hk₁ hk₂ hk₃;
     rename_i n;
     have h_abel : ∀ m : Fin (n + 1), ∑ i ∈ Finset.Iic m, x i * d i = x m * D m + ∑ i ∈ Finset.Iio m, (x i - x (i + 1)) * D i := by
       intro m;
@@ -193,7 +185,8 @@ lemma sum_mul_log_nonneg_of_weak_log_maj {n : ℕ}
         rw [ Finset.sum_eq_single 0, Finset.sum_eq_single 0 ] <;> aesop;
       · rw [ show ( Finset.Iic ( Fin.succ m ) : Finset ( Fin ( n + 1 ) ) ) = Finset.Iic ( Fin.castSucc m ) ∪ { Fin.succ m } from ?_, Finset.sum_union ] <;> norm_num [ Finset.sum_singleton, Finset.sum_union, Finset.sum_Ioc_succ_top, (Nat.succ_eq_succ ▸ Finset.Icc_succ_left_eq_Ioc) ] at *;
         · rw [ show ( Finset.Iio ( Fin.succ m ) : Finset ( Fin ( n + 1 ) ) ) = Finset.Iio ( Fin.castSucc m ) ∪ { Fin.castSucc m } from ?_, Finset.sum_union ] <;> norm_num [ Finset.sum_singleton, Finset.sum_union, Finset.sum_Ioc_succ_top, (Nat.succ_eq_succ ▸ Finset.Icc_succ_left_eq_Ioc) ] at *;
-          · rw [ ih ] ; ring!;
+          · rw [ ih ]
+            ring_nf!
             rw [ show ( Finset.Iic ( Fin.succ m ) : Finset ( Fin ( n + 1 ) ) ) = Finset.Iic ( Fin.castSucc m ) ∪ { Fin.succ m } from ?_, Finset.sum_union ] <;> norm_num ; ring!;
             ext i; simp [Finset.mem_Iic, Finset.mem_insert];
             exact ⟨ fun hi => or_iff_not_imp_left.mpr fun hi' => Nat.le_of_lt_succ <| hi.lt_of_ne hi', fun hi => hi.elim ( fun hi => hi.symm ▸ le_rfl ) fun hi => Nat.le_trans hi ( Nat.le_succ _ ) ⟩;
@@ -203,26 +196,23 @@ lemma sum_mul_log_nonneg_of_weak_log_maj {n : ℕ}
           exact ⟨ fun hi => or_iff_not_imp_left.mpr fun hi' => Nat.le_of_lt_succ <| hi.lt_of_ne hi', fun hi => hi.elim ( fun hi => hi.symm ▸ le_rfl ) fun hi => Nat.le_trans hi ( Nat.le_succ _ ) ⟩;
     convert h_abel ⟨ n, Nat.lt_succ_self _ ⟩ using 1;
     · rw [ show ( Iic ⟨ n, Nat.lt_succ_self _ ⟩ : Finset ( Fin ( n + 1 ) ) ) = Finset.univ from Finset.eq_univ_of_forall fun i => Finset.mem_Iic.mpr ( Nat.le_of_lt_succ i.2 ) ];
-    · refine' congr rfl ( Finset.sum_bij ( fun i hi => ⟨ i, by linarith [ Fin.is_lt i ] ⟩ ) _ _ _ _ ) <;> simp +decide [ Fin.add_def, Nat.mod_eq_of_lt ];
+    · refine' congr rfl ( Finset.sum_bij ( fun i hi => ⟨ i, by omega⟩ ) _ _ _ _ ) <;> simp [ Fin.add_def, Nat.mod_eq_of_lt ];
       · exact fun i j h => Fin.ext h;
       · exact fun i hi => ⟨ ⟨ i, by linarith [ Fin.is_lt i, show ( i : ℕ ) < n from hi ] ⟩, rfl ⟩
-  generalize_proofs at *;
   -- Since $D_k \geq 0$ for all $k$, we have $x_{n-1} D_{n-1} \geq 0$ and $(x_i - x_{i+1}) D_i \geq 0$ for all $i$.
   have h_nonneg : ∀ k : Fin n, 0 ≤ D k := by
     intro k
     have h_prod : ∏ i ∈ Finset.Iic k, y i ≥ ∏ i ∈ Finset.Iic k, x i := by
       specialize h_log_maj ( k + 1 ) ( by linarith [ Fin.is_lt k ] );
       rw [ show ( Finset.Iic k : Finset ( Fin n ) ) = Finset.image ( fun i : Fin ( k + 1 ) => ⟨ i, by linarith [ Fin.is_lt k, Fin.is_lt i ] ⟩ ) Finset.univ from ?_, Finset.prod_image ] <;> norm_num
-      generalize_proofs at *;
       · rwa [ Finset.prod_image <| by intros i hi j hj hij; simpa [ Fin.ext_iff ] using hij ];
       · exact fun i _ j _ hij => Fin.ext <| by simpa using congr_arg Fin.val hij;
-      · ext ⟨ i, hi ⟩ ; simp +decide [ Fin.ext_iff, Fin.le_iff_val_le_val ] ;
+      · ext ⟨ i, hi ⟩ ; simp [ Fin.ext_iff, Fin.le_iff_val_le_val ] ;
         exact ⟨ fun hi' => ⟨ ⟨ i, by linarith [ Fin.is_lt k ] ⟩, rfl ⟩, fun ⟨ a, ha ⟩ => ha ▸ Nat.le_trans ( Nat.le_of_lt_succ ( by linarith [ Fin.is_lt a, Fin.is_lt k ] ) ) ( Nat.le_refl _ ) ⟩
-    generalize_proofs at *;
     simp +zetaDelta at *;
     rw [ ← Real.log_prod _ _ fun i hi => ne_of_gt ( div_pos ( hy_pos i ) ( hx_pos i ) ) ] ; exact Real.log_nonneg ( by rw [ Finset.prod_div_distrib ] ; exact by rw [ le_div_iff₀ ( Finset.prod_pos fun i hi => hx_pos i ) ] ; linarith ) ;
-  generalize_proofs at *;
   exact h_neg <| h_abel.symm ▸ add_nonneg ( mul_nonneg ( le_of_lt ( hx_pos _ ) ) ( h_nonneg _ ) ) ( Finset.sum_nonneg fun i hi => mul_nonneg ( sub_nonneg.mpr ( hx_anti <| Nat.le_succ _ ) ) ( h_nonneg _ ) )
+
 /-
 PROBLEM
 For positive reals a, b: b - a ≥ a · log(b/a).
@@ -233,32 +223,8 @@ We need b - a ≥ a * log(b/a) for a, b > 0. Equivalently, dividing by a > 0: b/
 lemma sub_ge_mul_log_div {a b : ℝ} (ha : 0 < a) (hb : 0 < b) :
     b - a ≥ a * Real.log (b / a) := by
   nlinarith [ Real.log_le_sub_one_of_pos ( div_pos hb ha ), mul_div_cancel₀ b ha.ne' ]
-/-
-PROBLEM
-The key combinatorial lemma: weak log-majorization of nonneg antitone
-sequences implies the sum inequality ∑ x_i ≤ ∑ y_i.
-PROVIDED SOLUTION
-Prove by induction on n.
-Base case n = 0: Both sums are over Fin 0, so 0 ≤ 0. Use `simp` or `rfl`.
-Inductive step n → n + 1:
-We have x, y : Fin (n+1) → ℝ, both nonneg, antitone, with weak log-majorization.
-Case 1: x (Fin.last n) = 0.
-Since x is antitone and nonneg, x (Fin.last n) = 0 means the last entry is 0.
-Use `Fin.sum_univ_castSucc` to split the sum:
-∑ x = ∑_{i:Fin n} x (castSucc i) + x (Fin.last n) = ∑_{i:Fin n} x (castSucc i) + 0.
-Apply IH to (fun i => x (castSucc i)) and (fun i => y (castSucc i)):
-- These are antitone (composition of antitone x with monotone castSucc).
-- They are nonneg.
-- The log-majorization conditions for k ≤ n follow from the original conditions.
-By IH: ∑ x (castSucc i) ≤ ∑ y (castSucc i).
-Then ∑ x = ∑ x (castSucc i) ≤ ∑ y (castSucc i) ≤ ∑ y (castSucc i) + y (Fin.last n) = ∑ y.
-Case 2: x (Fin.last n) > 0 (so all x_i > 0, and therefore all y_i > 0).
-Use `sub_ge_mul_log_div` (which says b - a ≥ a * log(b/a)):
-∑ (y_i - x_i) ≥ ∑ x_i * log(y_i/x_i)
-Then use `sum_mul_log_nonneg_of_weak_log_maj` to get ∑ x_i * log(y_i/x_i) ≥ 0.
-So ∑ y_i - ∑ x_i ≥ 0.
-Key: for the positive case, show all x_i > 0 from antitonicity (x_i ≥ x (Fin.last n) > 0), and all y_i > 0 from the log-majorization condition (∏ y_i ≥ ∏ x_i > 0 forces y_i > 0 by induction on the product).
--/
+
+/- Weak log-majorization of nonneg antitone sequences implies the sum inequality ∑ x_i ≤ ∑ y_i. -/
 set_option maxHeartbeats 800000 in
 lemma weak_log_maj_sum_le {n : ℕ}
     {x y : Fin n → ℝ}
@@ -269,27 +235,25 @@ lemma weak_log_maj_sum_le {n : ℕ}
       ∏ i : Fin k, y ⟨i.val, by omega⟩) :
     ∑ i, x i ≤ ∑ i, y i := by
   induction' n with n ih
-  generalize_proofs at *;
   · norm_num +zetaDelta at *;
   · by_cases h_last : x (Fin.last n) = 0;
-    · simp_all +decide [ Fin.sum_univ_castSucc ];
-      refine' le_add_of_le_of_nonneg ( ih ( fun i => hx_nn _ ) ( fun i => hy_nn _ ) ( fun i j hij => hx_anti hij ) ( fun i j hij => hy_anti hij ) _ ) ( hy_nn _ );
-      intro k hk; specialize h_log_maj k ( by linarith ) ; simp_all +decide [ Fin.prod_univ_castSucc ] ;
+    · simp [ Fin.sum_univ_castSucc, h_last]
+      refine le_add_of_le_of_nonneg ( ih ( fun i => hx_nn _ ) ( fun i => hy_nn _ ) ( fun i j hij => hx_anti hij ) ( fun i j hij => hy_anti hij ) ?_ ) ( hy_nn _ );
+      intro k hk
+      simp
+      exact h_log_maj k (by linarith)
     · -- Since $x_{\text{last}} > 0$, we have $x_i > 0$ for all $i$.
       have hx_pos : ∀ i, 0 < x i := by
         exact fun i => lt_of_lt_of_le ( lt_of_le_of_ne ( hx_nn _ ) ( Ne.symm h_last ) ) ( hx_anti ( Fin.le_last _ ) )
-      generalize_proofs at *;
       have hy_pos : ∀ i, 0 < y i := by
-        intro i; specialize h_log_maj ( n + 1 ) le_rfl; contrapose! h_log_maj; simp_all +decide [ Fin.prod_univ_castSucc ] ;
+        intro i; specialize h_log_maj ( n + 1 ) le_rfl; contrapose! h_log_maj; simp_all [ Fin.prod_univ_castSucc ] ;
         exact lt_of_le_of_lt ( mul_nonpos_of_nonneg_of_nonpos ( Finset.prod_nonneg fun _ _ => hy_nn _ ) ( by linarith [ hy_anti ( show i ≤ Fin.last n from Fin.le_last i ) ] ) ) ( mul_pos ( Finset.prod_pos fun _ _ => hx_pos _ ) ( hx_pos _ ) )
-      generalize_proofs at *;
       have h_sum_mul_log_nonneg : 0 ≤ ∑ i, x i * Real.log (y i / x i) := by
         apply sum_mul_log_nonneg_of_weak_log_maj (fun i => hx_pos i) (fun i => hy_pos i) hx_anti (fun k hk => h_log_maj k hk)
-      generalize_proofs at *; (
       have h_sum_mul_log_nonneg : ∑ i, (y i - x i) ≥ ∑ i, x i * Real.log (y i / x i) := by
         exact Finset.sum_le_sum fun i _ => by have := sub_ge_mul_log_div ( hx_pos i ) ( hy_pos i ) ; ring_nf at *; linarith;
-      generalize_proofs at *; (
-      norm_num at *; linarith;))
+      norm_num at *; linarith;
+
 /-- Weak log-majorization of nonneg antitone sequences implies the sum of
 powers inequality. -/
 lemma weak_log_maj_sum_rpow_le {n : ℕ}
@@ -307,6 +271,7 @@ lemma weak_log_maj_sum_rpow_le {n : ℕ}
   · exact rpow_antitone_of_nonneg_antitone hx_anti hx_nn hr
   · exact rpow_antitone_of_nonneg_antitone hy_anti hy_nn hr
   · exact rpow_preserves_weak_log_maj hx_nn hy_nn h_log_maj hr
+
 /-! ## Key singular value inequality for products -/
 
 lemma sum_rpow_singularValues_mul_le (A B : Matrix d d ℂ) {r : ℝ} (hr : 0 < r) :
@@ -329,7 +294,7 @@ lemma sum_rpow_singularValues_mul_le (A B : Matrix d d ℂ) {r : ℝ} (hr : 0 < 
   · exact horn_weak_log_majorization A B
   · exact hr
 
-/-! ## Hölder inequality step -/
+/-! ## Hölder inequality for singular values -/
 
 /--
 The finite-sum Hölder inequality applied to sequences of r-th powers of
